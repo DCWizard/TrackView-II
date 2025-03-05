@@ -717,7 +717,7 @@
 
       ThisCanvas.onwheel        = function (ThisEvent){
         var ThisDirection       = Math.sign(ThisEvent.deltaY);
-        if(IsCtrlKeyDown(ThisEvent)){
+        if(IsShiftKeyDown(ThisEvent)){
           let ThisZoom            = duration  + (2 * ThisDirection); 
           ThisZoom                = Math.abs(Math.floor(ThisZoom));
           if((ThisZoom            > 0)
