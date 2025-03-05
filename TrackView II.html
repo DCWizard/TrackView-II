@@ -264,49 +264,48 @@
     height              = ThisCanvas.height - 2;
   var backgroundColor   = 'rgb(28, 32, 34)',
       paddingColor      = 'rgba(255, 255, 255, 0.05)',
-      TrackPadding      = 2, 
+      gridColor         = 'rgba(255, 255, 255, 0.05)',
+      rulerColor        = 'rgba(255, 255, 255, 0.75)',
+      progressColor     = 'rgba(255, 255, 255, 0.5)',
+      waveColor         = 'rgba(255, 255, 255, 0.1)',
+      waveBorderColor   = 'rgba(255, 255, 255, 0.1)',
+      scrollbarColor    = "rgba(255, 255, 255, 0.25)",
+      cursorColor       = '#ff0000';
+
+  var pixelRatio        = Math.ceil(window.devicePixelRatio), // = 1 default
+      grid              = true;
+      scrollable        = true, // SHOULD ALWAYS BE TRUE TRUST ME IT'S BETTER
+      ruler             = true,
+      rulerAtTop        = true,
+      progress          = true,
+      wave              = true,
+      waveBorder        = false,
+      cursor            = true;
+      
+  var TrackPadding      = 2, 
       duration          = 10,
       HalfDuration      = duration / 2;
-      grid              = true;
       gridNum           = duration * 10 + TrackPadding * 2; // gridNum           = 110,
       gridGap           = width / gridNum; // ​width: 1755 ​gridGap: 15.954545454545455
-      gridColor         = 'rgba(255, 255, 255, 0.05)',
-      CenterPlot        = (TrackPadding * gridGap),
-
-      pixelRatio        = Math.ceil(window.devicePixelRatio), // = 1 default
       density           = getDensity(); // = 1 default
+      CenterPlot        = (TrackPadding * gridGap),
       PixRatio          = (gridGap / pixelRatio),
-
-      scrollable        = true, // SHOULD ALWAYS BE TRUE TRUST ME IT'S BETTER
+      GridArea          = (height / gridGap);
+      GridScale         = (gridGap * 10);
+      CursorPos         = (width  / 2); // ONLY IN SCROLABLE
+      MiddleHeight      = (height / 2);
       
       // BASED ON THE VIDEO:
       TheCurrentTime    = 0,
       TotalDuration     = 0,
       sampleRate        = 0,
 
-      ruler             = true,
-      rulerColor        = 'rgba(255, 255, 255, 0.75)',
-      rulerAtTop        = true,
-      beginTime         = -5,
-
-      progress          = true,
-      progressColor     = 'rgba(255, 255, 255, 0.5)',
-      wave              = true,
-      waveColor         = 'rgba(255, 255, 255, 0.1)',
       waveScale         = 0.8,
       waveSize          = 1,
-      waveBorder        = false,
       waveBorderWidth   = 1,
-      waveBorderColor   = 'rgba(255, 255, 255, 0.1)',
-      scrollbarColor    = "rgba(255, 255, 255, 0.25)",
-      
-      CursorPos         = (width  / 2); // ONLY IN SCROLABLE
-      MiddleHeight      = (height / 2);
-      GridArea          = (height / gridGap);
-      GridScale         = (gridGap * 10);
 
-      cursorColor       = true,
-      cursorColor       = '#ff0000';
+      beginTime         = -5;
+
   var ScrollX;
   var IsGrabed          = false;
   var LastPageX;
@@ -401,9 +400,10 @@
       alert("Fail to process URL.\n\n" + ThisErr.message);
     });
   }  
+  
   function getDensity               () {
     if(gridGap === 0){ return 1;}
-    let fontSize        = 11;
+    let fontSize        = 12;
     ctx.font            = `${fontSize * pixelRatio}px Arial`;
     let rulerWidth      = ctx.measureText('99:99:99').width;
     return (function loop(second) {
@@ -508,7 +508,9 @@
       var SamplePlaying;
       
       function PlaySample   (){
-
+        if(SamplePlaying){
+          return;
+        }
         if(TheBackThread){
           ThePlaySampleWorker.postMessage({"CMD":"PlaySample"}); 
           ThePlaySampleWorker.onmessage = function (ThisEvent) { 
@@ -525,9 +527,6 @@
           PlayThisSample ();
         }
         function PlayThisSample (){
-          if(SamplePlaying){
-            return;
-          }
           let ThisCurrentTime     = ThisAudio.currentTime;
           SamplePlaying           = setTimeout(function (){
             setTimeout(function (){
@@ -579,7 +578,7 @@
       }
       function drawRuler      () {
         let fontSize        = 12;
-        let fontHeight      = 18;
+        let fontHeight      = 16;
         let fontTop         = 30;
         let HalfFontHeight  = (fontHeight / 2) * pixelRatio;
         let FullFontHeight  = (fontHeight) * pixelRatio;
@@ -716,6 +715,38 @@
       }
       // FUNCTION & EVENT REGARDING THE TRACK VIEW
 
+      ThisCanvas.onwheel        = function (ThisEvent){
+        var ThisDirection       = Math.sign(ThisEvent.deltaY);
+        if(IsCtrlKeyDown(ThisEvent)){
+          let ThisZoom            = duration  + (2 * ThisDirection); 
+          ThisZoom                = Math.abs(Math.floor(ThisZoom));
+          if((ThisZoom            > 0)
+          && (ThisZoom           <= TotalDuration)
+          ){
+            duration              = ThisZoom;
+            HalfDuration          = duration / 2;
+            gridNum               = duration * 10 + TrackPadding * 2;
+            gridGap               = width / gridNum; // ​width: 1755 ​gridGap: 15.954545454545455
+            density               = getDensity(); // = 1 default
+            CenterPlot            = (TrackPadding * gridGap),
+            PixRatio              = (gridGap / pixelRatio),
+            GridArea              = (height / gridGap);
+            GridScale             = (gridGap * 10);
+
+            beginTime             = CalcBeginTime ();
+            if(!(animationFrameID)){
+              Draw ();
+            }
+          }
+        } else {
+          let ThisNewPos          = TheCurrentTime  + (0.5 * ThisDirection); 
+          if((ThisNewPos         <= TotalDuration)){
+            ThisAudio.currentTime = ThisNewPos;
+            TheCurrentTime        = ThisAudio.currentTime;
+            beginTime             = CalcBeginTime ();
+          }
+        }
+      }
       ThisCanvas.onmouseenter   = function (ThisEvent){
         WaveCursor.style.display= "";
       }
@@ -725,7 +756,6 @@
         IsGrabed                = false;
       }
       ThisCanvas.onmousemove    = function (ThisEvent){
-
         if(IsGrabed){ // By the pussy
           Waveform.style.cursor = "grab";
           if(SamplePlaying){
@@ -737,11 +767,6 @@
           ThisAudio.currentTime = LastCurrentTime + (scrollable ? -diffTime : diffTime);
           TheCurrentTime        = ThisAudio.currentTime;
           beginTime             = CalcBeginTime ();
-
-          if(!(animationFrameID)){
-            Draw ();
-            PlaySample();
-          }
         } else {
           WaveCursor.style.left = ThisEvent.pageX - TrackView.getBoundingClientRect().left + 'px';
           let ThisLeftButtonDown= (ThisEvent.buttons || ThisEvent.button) & 1;
@@ -766,13 +791,18 @@
         }
         IsGrabed                = false;
         Waveform.style.cursor   = "";
-
-        if(!(animationFrameID)){
-          Draw ();
-          PlaySample();
-        }
       }
       // FUNCTION & EVENT RELATIVE TO VIDEO
+      function OnWheel            (ThisEvent){
+        if(!(ThisAudio)){return;}
+        var ThisDirection       = (ThisEvent.deltaY < 0) ? -1 : 1; // Math.sign(ThisEvent.deltaY);
+        let ThisVolume          = ThisAudio.volume  + (0.05 * ThisDirection); // CtrlVolumeBar.value; 
+
+        if(ThisVolume           < 0){ThisVolume     = 0;}
+        if(ThisVolume           > 1){ThisVolume     = 1;}
+        ThisAudio.volume        = ThisVolume;
+      }
+      ThisAudio.onwheel         = OnWheel;
       function OnTimeUpdate       (ThisEvent){
         if(SamplePlaying){
           return;
@@ -805,6 +835,16 @@
       ThisAudio.onended         = OnStop;
     }
   }
+  // MISC LIB
+
+  function IsNull                 (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) );} // || (isNaN(ThisValue))
+  function IsReallyNull           (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) || (isNaN(ThisValue) === false));}
+  function IsFalse                (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) || (ThisValue === false));}
+  function IsTrue                 (ThisValue)          { return ((ThisValue !== undefined) && (ThisValue !== null) && (ThisValue === true));}
+
+  function IsCtrlKeyDown          (ThisEvent)          { return (!!(ThisEvent.ctrlKey) ); }
+  function IsShiftKeyDown         (ThisEvent)          { return (!!(ThisEvent.shiftKey)); }
+
   window.onclick                = function (){
     window.onclick            = null; 
     WaitingText.innerHTML     = "Processing file...";
