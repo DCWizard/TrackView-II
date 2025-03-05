@@ -7,6 +7,7 @@ Special thanks to https://github.com/zhw2590582/WFPlayer for the Very nice desig
 This version is superior
 
 It has a Spectrum analyser
+You can zoom in/out with the mouse wheel.
 
 It let your hear sample of sound as you move the cursor like in Premiere Pro.
 Every editor I tried don't have that feature;
@@ -24,7 +25,6 @@ Just open the TrackView II.html in your browser.
 
 You don't even need a web server.
 
-N.b.; You'll have the enhanced version on a server though.
 
 
 Yes, it's that simple.
