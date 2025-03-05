@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content= "width=device-width, initial-scale=1.0">
+  <title>TrackView II</title>
+  <style>
+    *, ::before, ::after {
+      box-sizing: border-box;
+    }
+    html, body, body {
+      padding:0;
+      margin: 0px;
+      height: 100%;
+      width:  100%;
+      background-color:rgb(32, 35, 37);
+    }
+    html, body, .MainContainer {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      height: 100%;
+    }
+    #WaitingBackground {
+    	position: absolute;
+    	top: 0;
+    	left: 0;
+    	width: 100vw;
+    	height: 100vh;
+      color:white;
+      font-size: min(7vh,7vw);
+      text-align: center;
+      align-content: center;
+    	background-color: #00F8;
+    	z-index: 2147483647;
+    }
+    .MainContainer {
+      display: flex;
+      height: 100%;
+      flex-direction: column;
+      font-size: min(1.5vh, 1.5vw);
+      color: #ccc;
+      background: rgb(32, 35, 37);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    .MainPanel {
+      display: flex;
+      flex: 1;
+    }
+    .MainPanel .LeftPanel {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      border-right: 1px solid rgb(10, 10, 10);
+    }
+    .MainPanel .RightPanel {
+      width: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: min(5.5vh, 5.5vw);
+      background-color: rgb(16, 17, 19);
+    }
+    video {
+      width: 100%;
+      max-height: 70vh;
+    }
+    #Waveform {
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      width:100%;
+      height: 15vh;
+      bottom:0;
+      background-color: rgb(28, 32, 34);
+      border-top: 1px solid rgb(10, 10, 10);
+    }
+    #WaveCursor {
+    	z-index: 10;
+    	opacity: .25;
+    	user-select: none;
+    	pointer-events: none;
+    	background-color: #fff;
+    	width: 1px;
+    	height: 100%;
+    	position: absolute;
+    	top: 0;
+    	bottom: 0;
+    	left: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: min(5.5vh, 5.5vw);
+      border-bottom: 1px solid rgb(10, 10, 10);
+      background-color: rgb(68, 87, 96);
+    }
+    .header .left {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      padding-left: 0px;
+    }
+    .header .right {
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+    .header .right .item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 0 min(3vh, 3vw);
+      cursor: pointer;
+      overflow: hidden;
+      color: #f1fa8c;
+      border-left: 1px solid rgb(17, 21, 24);
+      background-color: rgb(39, 41, 54);
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    .header .right .item:hover {
+      color: #fff;
+      background-color: rgb(66, 82, 95);
+    }
+    .header .right .item .open {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+    }
+    input[type="file"] {
+      padding: min(1vh, 1vw);
+      width:50vw;
+      color: rgb(220, 220, 221);
+      font-size: min(2vh, 2vw);
+      cursor: pointer;
+      border-bottom: 1px solid rgb(10, 10, 10);
+      border-radius: 5px;
+      background-color: rgb(42, 56, 62);
+    }
+  </style>
+</head>
+<body>
+  <div id="WaitingBackground">
+    <p id="WaitingText"></p> 
+  </div> 
+  <div class="MainContainer">
+    <header class="header">
+      <div class="left">
+        <input type="file" id="videoInput" accept="video/*">
+      </div>
+      <div class="log"></div>
+      <div class="right">
+        <a class="item" onclick="window.open('https://github.com/DCWizard/TrackView')">
+          Github
+        </a>
+        <a class="item" onclick="window.open('https://thinknspeak.net/donate')">
+          Donate
+        </a>
+      </div>
+    </header>
+    <section class="MainPanel">
+      <div class="LeftPanel">
+        <canvas id='Spectrum' width="800" height="350" style="width:100%;flex:content;padding:min(3vh, 3vw);"></canvas>
+      </div>
+      <div class="RightPanel">
+        <video id="MainAudio" src="https://wfplayer.js.org/sample.mp4" controls=""></video>
+      </div>
+    </section>
+    <footer id="Waveform">
+      <canvas id="TrackView" width="1738" height="199" style="width: 100%;"></canvas>
+      <div id="WaveCursor" style="left: 1752px; display: none;"></div>
+    </footer>
+  </div>
+  <script>
+  document.getElementById('videoInput').addEventListener('change', handleFileSelect);
+  setTimeout(function (){
+    WaitingText.innerHTML = "Click to initialize<br>Audio Context";
+    ThePlaySampleWorker.postMessage({"CMD":"Init"}); 
+  }, 125);
+  var ThisAudio           = document.getElementById('MainAudio');
+  
+  function handleFileSelect(ThisEvent) {
+    let ThisFile = ThisEvent.target.files[0];
+    if(ThisFile){
+      WaitingText.innerHTML = "Processing file...";
+      WaitingBackground.style.display = "";
+      try{
+        AnalyseAudioFile(ThisFile, function (ThisAudioContext, ThisAudioBuffer){     
+          ThisChannelData   = ThisAudioBuffer.getChannelData(0);
+          // console.log("ThisChannelData", ThisChannelData);        
+          var ThatAudio     = URL.createObjectURL(ThisFile);
+          var ThisAudio     = document.getElementById('MainAudio'); // document.querySelector("video"); 
+          ThisAudio.src     = ThatAudio;
+          PlayFromAudio ();
+        });
+      }
+      catch(ThisErr){
+        alert("Failed to open file. \n\n" + ThisErr.message);
+        WaitingBackground.style.display = "none";
+      }
+    }
+  }
+  var ThisAudioContext;
+  var animationFrameID;
+  var ThePlaySampleWorker;
+  var TheBackThread;
+  try{
+    ThePlaySampleWorker = new Worker('PlaySample.js'); 
+    ThePlaySampleWorker.postMessage({"CMD":"Init"}); 
+
+    ThePlaySampleWorker.onmessage = function (ThisEvent) { 
+      let ThisData  = ThisEvent.data;
+
+      if(ThisData !== undefined){ 
+        let ThisCmd = ThisData.CMD;
+        switch(ThisCmd){
+        case "Running":
+          console.log(ThisCmd);
+          TheBackThread = "Running";
+          break;
+        default:
+          console.log(ThisData);
+          break;
+        }
+      } 
+    };
+  }
+  catch(ThisErr){
+    alert("Not running on a server.\nQuality of PlaySample will be reduced.\n\n" + ThisErr.message);
+  }
+  let ThisInterval = setInterval(function (){
+    if(TheBackThread){
+      clearInterval(ThisInterval);ThisInterval = null;
+    }
+  }, 125);
+  setTimeout(function (){
+    if(ThisInterval){
+      clearInterval(ThisInterval);ThisInterval = null;
+    }
+    if(!(TheBackThread)){
+      alert("Not running on a server.\nQuality of PlaySample will be reduced.\n\n");
+    }
+  }, 2000);
+  var SpectrumStarted;
+  var TheFrequencyData;
+  var TheAnalyser;
+  var TheAudioSrc;
+
+  var TheArrayBuffer;
+  var ThisChannelData;
+
+  var ThisCanvas        = document.getElementById('TrackView'),
+    ctx                 = ThisCanvas.getContext('2d'),
+    width               = ThisCanvas.width,
+    height              = ThisCanvas.height - 2;
+  var backgroundColor   = 'rgb(28, 32, 34)',
+      paddingColor      = 'rgba(255, 255, 255, 0.05)',
+      TrackPadding      = 2, 
+      duration          = 10,
+      HalfDuration      = duration / 2;
+      grid              = true;
+      gridNum           = duration * 10 + TrackPadding * 2; // gridNum           = 110,
+      gridGap           = width / gridNum; // ​width: 1755 ​gridGap: 15.954545454545455
+      gridColor         = 'rgba(255, 255, 255, 0.05)',
+      CenterPlot        = (TrackPadding * gridGap),
+
+      pixelRatio        = Math.ceil(window.devicePixelRatio), // = 1 default
+      density           = getDensity(); // = 1 default
+      PixRatio          = (gridGap / pixelRatio),
+
+      scrollable        = true, // SHOULD ALWAYS BE TRUE TRUST ME IT'S BETTER
+      
+      // BASED ON THE VIDEO:
+      TheCurrentTime    = 0,
+      TotalDuration     = 0,
+      sampleRate        = 0,
+
+      ruler             = true,
+      rulerColor        = 'rgba(255, 255, 255, 0.75)',
+      rulerAtTop        = true,
+      beginTime         = -5,
+
+      progress          = true,
+      progressColor     = 'rgba(255, 255, 255, 0.5)',
+      wave              = true,
+      waveColor         = 'rgba(255, 255, 255, 0.1)',
+      waveScale         = 0.8,
+      waveSize          = 1,
+      waveBorder        = false,
+      waveBorderWidth   = 1,
+      waveBorderColor   = 'rgba(255, 255, 255, 0.1)',
+      scrollbarColor    = "rgba(255, 255, 255, 0.25)",
+      
+      CursorPos         = (width  / 2); // ONLY IN SCROLABLE
+      MiddleHeight      = (height / 2);
+      GridArea          = (height / gridGap);
+      GridScale         = (gridGap * 10);
+
+      cursorColor       = true,
+      cursorColor       = '#ff0000';
+  var ScrollX;
+  var IsGrabed          = false;
+  var LastPageX;
+  var LastCurrentTime;
+
+  var FPS30             = (1.0 / 30.0);
+  var FrameCounter      = 0.0;
+  var FrameDropped      = 0.0;
+  var LastTimeStamp     = new Date();
+
+  var Int               = ThisValue => {var Val = parseInt(ThisValue); return (isNaN(Val))?0:Val;}
+  function CalcBeginTime  (ThisTime  = TheCurrentTime) {return (scrollable ? (ThisTime - HalfDuration) : (Math.floor(ThisTime / duration) * duration));}
+  function CalcScrollX    (ThisTime  = TheCurrentTime) {return (scrollable ? (CursorPos)               : (CenterPlot + (ThisTime - beginTime) * GridScale));}
+  function CalcCursorTime (ThisPosX) { 
+    let ThePadding      = (CenterPlot / pixelRatio);
+    let ThePixRatio     = (PixRatio * 10);
+    // console.log("ThePadding",  ThePadding);
+    // console.log("ThePixRatio", ThePixRatio);
+    let TheOutput       = (ThisPosX - ThePadding) / ThePixRatio;
+    return TheOutput    + beginTime;
+  }   
+  function GetCanvasPos   (ThisEvent){
+    let WinXRatio       = (ThisCanvas.width        / ThisCanvas.scrollWidth);
+    let WinYRatio       = (ThisCanvas.height       / ThisCanvas.scrollHeight);
+
+    let ThisPtX         = Int(ThisEvent.pageX * WinXRatio);
+    let ThisPtY         = Int(ThisEvent.pageY * WinYRatio);
+
+    // console.info("MouseClick:", "X:",(ThisPtX), "Y:", (ThisPtY));
+    let ThisMarker      = {"X":(ThisPtX), "Y":(ThisPtY) };
+    return ThisMarker;
+  }
+
+  function ReadFileAudioData        (ThisFile, ThisCallBack){
+    let ThisReader            = new FileReader();
+    function OnDataLoaded (ThisEvent){
+      ThisReader.removeEventListener('load', OnDataLoaded);
+      TheArrayBuffer          = ThisEvent.target.result; //  ThisReader.result;
+      // console.log("TheArrayBuffer", TheArrayBuffer);
+
+      let ThisAudioContext    = new (window.AudioContext || window.webkitAudioContext || window.mozAudioContext)();
+
+      if(ThisAudioContext){
+        ThisAudioContext.decodeAudioData(TheArrayBuffer, function (ThisDataBuffer){
+          if((ThisCallBack)){ 
+            ThisCallBack(ThisAudioContext, ThisDataBuffer); 
+          }
+        }, function (ThisErr){
+          alert('Error ReadFileAudioData decoding audio: \n\n' + ThisErr.message);
+          WaitingBackground.style.display = "none";
+        });
+        return true;
+      } else {
+        alert('Error No ReadFileAudioData Audio Context');
+        WaitingBackground.style.display = "none";
+      }
+    }
+    ThisReader.addEventListener('load', OnDataLoaded);
+    ThisReader.readAsArrayBuffer(ThisFile);
+  }
+  function AnalyseAudioFile         (ThisFile, ThisCallBack){
+    ReadFileAudioData (ThisFile, function (ThisAudioContext, ThisAudioBuffer){
+      // console.log("ThisAudioBuffer", ThisAudioBuffer);
+
+      if((ThisCallBack)){ 
+        ThisCallBack(ThisAudioContext, ThisAudioBuffer); 
+      }
+    });
+  }
+  function GetHttpObjectArrayBuffer (ThisUrl,  ThisCallBack){
+    fetch(ThisUrl).then(ThisRes =>  {
+        return ThisRes.arrayBuffer();
+      }
+    ).then(ThisArrayBuffer => {
+      if((ThisCallBack)){
+        ThisCallBack(ThisArrayBuffer);
+      }    
+    }).catch((ThisErr) => {
+      alert("Fail to process URL.\n\n" + ThisErr.message);
+      WaitingBackground.style.display = "none";
+    });
+    ;
+  }
+  function GetHttpObjectUrl(ThisUrl, ThisCallBack){
+    fetch(ThisUrl).then(ThisRes => ThisRes.blob()).then(ThisBlob => {
+      // console.log("ThisBlob", ThisBlob);
+      var ThisBlobURL = URL.createObjectURL(ThisBlob);
+      if((ThisCallBack)){
+        ThisCallBack(ThisBlobURL);
+      }    
+    }).catch((ThisErr) => {
+      alert("Fail to process URL.\n\n" + ThisErr.message);
+    });
+  }  
+  function getDensity               () {
+    if(gridGap === 0){ return 1;}
+    let fontSize        = 11;
+    ctx.font            = `${fontSize * pixelRatio}px Arial`;
+    let rulerWidth      = ctx.measureText('99:99:99').width;
+    return (function loop(second) {
+      let rate          = ((gridGap * second) / (rulerWidth * 1.5));
+      if(rate > 1){ 
+        return Math.floor(second / 10);
+      }
+      return loop(second + 10);
+    })(10);
+  }
+  function secondToTime             (second) {
+    let add0 = (num) => (num < 10 ? `0${num}` : String(num));
+    let hour = Math.floor(second / 3600);
+    let min  = Math.floor((second - hour * 3600) / 60);
+    let sec  = Math.floor(second - hour * 3600 - min * 60);
+    return [hour, min, sec].map(add0).join(':');
+  }
+  function clamp                    (num, a, b) {
+    return Math.max(Math.min(num, Math.max(a, b)), Math.min(a, b));
+  }
+  
+  async function PlayFromAudio (){
+    ThisAudioContext    = new (window.AudioContext || window.webkitAudioContext || window.mozAudioContext)();
+
+    if("http"          == ThisAudio.src.substr(0, 4)){
+      if(ThisAudio.error){
+        alert("Failed to open file: \n\n" + ThisAudio.error.message);
+        WaitingBackground.style.display = "none";
+        return;
+      }
+      let IsReady = {"Status":false};
+      GetHttpObjectArrayBuffer(ThisAudio.src, function (ThisArrayBuffer){
+        // console.log("ThisArrayBuffer", ThisArrayBuffer);
+        TheArrayBuffer      = ThisArrayBuffer;
+        ThisAudioContext.decodeAudioData(TheArrayBuffer, function (ThisAudioBuffer){
+          ThisChannelData   = ThisAudioBuffer.getChannelData(0);
+          // console.log("ThisChannelData", ThisChannelData);        
+          // Start();
+          IsReady.Status = true;
+        });      
+      });
+      GetHttpObjectUrl(ThisAudio.src, function (ThisBlobURL){
+        // console.log(ThisBlobURL);
+        ThisAudio.src        = ThisBlobURL;
+          let ThisInterval              = setInterval (function (){
+            if(IsReady.Status){
+              clearInterval(ThisInterval);
+              Start();
+            }
+          }, 125);
+      });
+    } else 
+    if("blob"          == ThisAudio.src.substr(0, 4)){
+      Start();
+    } else 
+    if("file"          == document.baseURI.substr(0, 4)){
+      alert("CAN'T PLAY ANALYSE IN LOCAL FILE MODE.\nSORRY THOSE BASTERED WON'T ALLOW.\n\nLIKE IT'S A SECURITY RISK.\nGIVE ME A F. BREAK!");
+      // ALWAYS CORS: AND REFUSE TO GIVE DATA
+      WaitingBackground.style.display = "none";
+    } else {
+      alert("Unknown or unsupported File type.");
+      WaitingBackground.style.display = "none";
+    }
+     
+    function Start(){
+      // console.log("Analyser Started");
+      if(animationFrameID){
+        cancelAnimationFrame(animationFrameID); animationFrameID = null;
+      }
+      // INIT DRAW
+      TheAnalyser         = ThisAudioContext.createAnalyser();
+      TheAudioSrc         = ThisAudioContext.createMediaElementSource(ThisAudio);
+      TheAudioSrc.connect(TheAnalyser);
+      TheAnalyser.connect(ThisAudioContext.destination);
+ 
+      TheFrequencyData    = new Uint8Array(TheAnalyser.frequencyBinCount);
+      var TheSpectrum     = document.getElementById('Spectrum'),
+        SpectrumCtx       = TheSpectrum.getContext('2d'),
+        SpectrumWidth     = TheSpectrum.width,
+        SpectrumHeight    = TheSpectrum.height - 2,
+        BandWidth         = 10, 
+        BandWidthGap      = 2, 
+        MeterCount        = 800 / (10 + 2), 
+        BandGrad          = SpectrumCtx.createLinearGradient(0, 0, 0, 300);
+        BandGrad.addColorStop(1,    '#0f0');
+        BandGrad.addColorStop(0.5,  '#ff0');
+        BandGrad.addColorStop(0,    '#f00');
+      
+      function DrawSpectrum (){
+        TheAnalyser.getByteFrequencyData(TheFrequencyData);
+
+        var FreqStep      = Math.round(TheFrequencyData.length / MeterCount); 
+        SpectrumCtx.clearRect(0, 0, SpectrumWidth, SpectrumHeight);
+        for(let Indx = 0; Indx < MeterCount; Indx++) {
+          let ThisX       = Indx * 12;
+          let ThisFreq    = TheFrequencyData[Indx * FreqStep];
+          SpectrumCtx.fillStyle = BandGrad; 
+          SpectrumCtx.fillRect(ThisX, SpectrumHeight - ThisFreq, BandWidth, SpectrumHeight); 
+        }
+      }
+
+      var SamplePlaying;
+      
+      function PlaySample   (){
+
+        if(TheBackThread){
+          ThePlaySampleWorker.postMessage({"CMD":"PlaySample"}); 
+          ThePlaySampleWorker.onmessage = function (ThisEvent) { 
+            let ThisData     = ThisEvent.data;
+            let ThisCmd      = ThisData.CMD;
+            switch(ThisCmd){
+            case "PlaySample":
+              PlayThisSample ();
+              break;
+            }
+            console.log("RCV from PlaySample",  ThisCmd); 
+          };
+        } else {
+          PlayThisSample ();
+        }
+        function PlayThisSample (){
+          if(SamplePlaying){
+            return;
+          }
+          let ThisCurrentTime     = ThisAudio.currentTime;
+          SamplePlaying           = setTimeout(function (){
+            setTimeout(function (){
+              SamplePlaying       = null;
+            }, 125);
+            ThisAudio.pause();
+            ThisAudio.currentTime = ThisCurrentTime;
+          },125 );
+          ThisAudio.play();
+        }
+      }
+      sampleRate          = ThisAudioContext.sampleRate;
+      TheCurrentTime      = ThisAudio.currentTime;
+      TotalDuration       = ThisAudio.duration;
+      beginTime           = CalcBeginTime ();
+
+      function Draw (){
+        ScrollX           = CalcScrollX();
+
+        drawBackground();
+        drawGrid      ();
+        drawRuler     ();
+        drawWave      ();
+        drawCursor    ();
+        drawScrollbar ();
+        DrawSpectrum  ();
+        WaitingBackground.style.display = "none";
+      }
+      Draw ();
+      
+      function drawBackground () {
+        ctx.clearRect(0, 0,   width, height);
+        ctx.fillStyle       = backgroundColor;
+        ctx.fillRect(0, 0,    width, height);
+        ctx.fillStyle       = paddingColor;
+        ctx.fillRect(0, 0,    CenterPlot, height);
+        ctx.fillRect(width  - CenterPlot, 0, CenterPlot, height);
+      }
+      function drawGrid       () {
+        ctx.fillStyle = gridColor;
+        let ThisCurrentTime = (TheCurrentTime - parseInt(TheCurrentTime, 10)) * GridScale;
+        for(let index       = 0; index < gridNum + 10; index += density) {
+          let x = (scrollable)? gridGap * index - ThisCurrentTime : gridGap * index;
+          ctx.fillRect(x, 0, pixelRatio, height);
+        }
+        for(let index = 0; index < GridArea; index += density){
+          ctx.fillRect(0, gridGap * index, width, pixelRatio);
+        }
+      }
+      function drawRuler      () {
+        let fontSize        = 12;
+        let fontHeight      = 18;
+        let fontTop         = 30;
+        let HalfFontHeight  = (fontHeight / 2) * pixelRatio;
+        let FullFontHeight  = (fontHeight) * pixelRatio;
+
+        ctx.font            = `${fontSize * pixelRatio}px Arial`;
+        ctx.fillStyle       = rulerColor;
+        let second          = -1;
+        let RelativeTextX   = fontSize * pixelRatio * 2;
+        let RelativeTextY   = fontTop * pixelRatio;
+        let ThisCurrentTime = (TheCurrentTime - parseInt(TheCurrentTime, 10)) * GridScale;
+
+        // NEVER CALCULATE IN A DRAWING LOOP IF YOU CAN AVOID
+        // AND OBVIOUSLY DON'T CALCULATE IT TWICE
+        // EXCEPTION -+ THOSE COST 1CC ONLY THE SAME AS A IF
+        // WHY IS IT IMPORTANT? BECAUSE I INTEND TO DO MUCH MORE THAN JUST THAT
+        for(let index = 0; index < gridNum + 10; index += 1) {
+          let x = scrollable? (gridGap * index - ThisCurrentTime) : (gridGap * index);
+          if(((index - TrackPadding) % 10) === 0) {
+            second         += 1;
+            ctx.fillRect(
+              x,
+              rulerAtTop ? 0 : (height - FullFontHeight),
+              pixelRatio,
+              FullFontHeight
+            );
+            let time      = Math.floor(beginTime + second);
+            if(((time % density) === 0) && (time >= 0)){
+              ctx.fillText(
+                secondToTime(time), 
+                (x - RelativeTextX + pixelRatio),
+                rulerAtTop ? (RelativeTextY) : (height - RelativeTextY + fontSize)
+              );
+            }
+          } else 
+          if((index - TrackPadding) % 5 === 0){
+            ctx.fillRect(
+              x,
+              rulerAtTop ? 0 : height - HalfFontHeight,
+              pixelRatio,
+              HalfFontHeight
+            );
+          }
+        }
+      }
+      function drawWave       () {
+        if(!(ThisChannelData)){ return; }
+        let GridSpace     = (gridGap * TrackPadding);
+        let waveWidth     = (width - GridSpace * 2);
+        let startIndex    = Math.floor(beginTime * sampleRate);
+        let endIndex      = Math.floor(clamp((beginTime + duration) * sampleRate, startIndex, Infinity));
+        let step          = Math.floor((endIndex - startIndex) / waveWidth);
+        let stepIndex     = 0;
+        let xIndex        = 0;
+        let min           = 1;
+        let max           = -1;
+
+        // NEVER CALCULATE IN A DRAWING LOOP IF YOU CAN AVOID
+        // AND OBVIOUSLY DON'T CALCULATE IT TWICE
+        // EXCEPTION -+ THOSE COST 1CC ONLY THE SAME AS A IF
+        // WHY IS IT IMPORTANT? BECAUSE I INTEND TO DO MUCH MORE THAN JUST THAT
+        for(let Indx      = startIndex; Indx < endIndex; Indx += waveSize) {
+          stepIndex      += 1;
+          let item        = ThisChannelData[Indx] || 0;
+          if(item         < min){ 
+            min           = item; 
+          } else 
+          if(item         > max){ 
+            max           = item; 
+          }
+          let WaveY       = ((1 + min * waveScale) * MiddleHeight);
+          let WaveH       = Math.max(1, (max - min) * MiddleHeight * waveScale);
+          if((stepIndex  >= step) && (xIndex < waveWidth)) {
+            let waveX     = GridSpace + xIndex;
+            if(waveBorder) {
+              ctx.strokeStyle = waveBorderColor; // Set the border color
+              ctx.lineWidth   = waveBorderWidth; // Set the border width
+              // Draw the border around the rectangle
+              ctx.strokeRect(
+                waveX,
+                WaveY,
+                waveSize,
+                WaveH
+              );
+            }
+            // Fill the rectangle with the desired color
+            ctx.fillStyle = (progress && ScrollX >= waveX ? progressColor : waveColor);
+            ctx.fillRect(
+              (waveX      + (waveBorder ? waveBorderWidth / 2 : 0)),
+              (WaveY      + (waveBorder ? waveBorderWidth / 2 : 0)),
+              (waveSize   - (waveBorder ? waveBorderWidth : 0)), 
+              (WaveH      - (waveBorder ? waveBorderWidth : 0)) 
+              // Adjust the height for the border
+            );
+            xIndex       += waveSize;
+            stepIndex     = 0;
+            min           = 1;
+            max           = -1;
+          }
+        }
+      }
+      function drawCursor     () {
+        ctx.fillStyle       = cursorColor;
+        ctx.globalAlpha = 0.25;
+        ctx.fillRect(ScrollX - pixelRatio, 0, pixelRatio, height);
+        ctx.globalAlpha = 0.5; // WE DON'T WANT TO HIDE THE WAVE 100%
+        ctx.fillRect(ScrollX    , 0, pixelRatio, height);
+        ctx.globalAlpha = 0.25;
+        ctx.fillRect(ScrollX + pixelRatio, 0, pixelRatio, height);
+        ctx.globalAlpha = 1;
+      }
+      function drawScrollbar  () {
+        if(!scrollable || !TotalDuration || TotalDuration === Infinity) return;
+        let totalWidth          = (PixRatio) * 10 * TotalDuration;
+        let scrollbarWidth      = (width / totalWidth) * width;
+        let scrollbarHeight     = (5 * pixelRatio);
+        let scrollbarLeft       = (TheCurrentTime / TotalDuration) * (width - scrollbarWidth);
+        let scrollbarTop        = (rulerAtTop ? (height - scrollbarHeight) : 0);
+        ctx.fillStyle           = scrollbarColor;
+        ctx.fillRect(scrollbarLeft, scrollbarTop, scrollbarWidth, scrollbarHeight);
+      }
+      function renderFrame    () {
+        animationFrameID      = requestAnimationFrame(renderFrame);
+        // RESULT: 60 FRAMES/SEC. TOO FAST AND IT'S A WASTE HERE MAKING IT AT 30FPS
+        let CheckTime         = new Date();
+        let ThisDiffTime      = ((CheckTime - LastTimeStamp) / 1000); 
+        if((ThisDiffTime     >= FPS30)){    // IF IT'S GOOD ENOUGH FOR MOVIES...
+          LastTimeStamp       = new Date(); // DON'T WASTE MY COMPUTER RESOURCES.
+          FrameCounter++;
+        } else {
+          FrameDropped++;
+          return;
+        }
+        Draw ();
+      }
+      // FUNCTION & EVENT REGARDING THE TRACK VIEW
+
+      ThisCanvas.onmouseenter   = function (ThisEvent){
+        WaveCursor.style.display= "";
+      }
+      ThisCanvas.onmouseleave   = function (ThisEvent){
+        WaveCursor.style.display= 'none';
+        Waveform.style.cursor   = "";
+        IsGrabed                = false;
+      }
+      ThisCanvas.onmousemove    = function (ThisEvent){
+
+        if(IsGrabed){ // By the pussy
+          Waveform.style.cursor = "grab";
+          if(SamplePlaying){
+            return;
+          }
+          let diffWidth         = ThisEvent.pageX - LastPageX;
+          let diffTime          = (diffWidth / ((PixRatio) * 10)); 
+
+          ThisAudio.currentTime = LastCurrentTime + (scrollable ? -diffTime : diffTime);
+          TheCurrentTime        = ThisAudio.currentTime;
+          beginTime             = CalcBeginTime ();
+
+          if(!(animationFrameID)){
+            Draw ();
+            PlaySample();
+          }
+        } else {
+          WaveCursor.style.left = ThisEvent.pageX - TrackView.getBoundingClientRect().left + 'px';
+          let ThisLeftButtonDown= (ThisEvent.buttons || ThisEvent.button) & 1;
+          if(ThisLeftButtonDown){
+            // console.log("Grabing started.");
+            LastPageX           = ThisEvent.pageX;
+            LastCurrentTime     = TheCurrentTime;
+            IsGrabed            = true;
+          }
+        }
+      }
+      ThisCanvas.onmouseup      = function (ThisEvent){
+        Waveform.style.cursor   = "";
+      }
+      ThisCanvas.onclick        = function (ThisEvent){
+        if(!(IsGrabed)){
+          let ThisMarker        = GetCanvasPos(ThisEvent);
+          let ThisTime          = CalcCursorTime(ThisMarker.X);
+          ThisAudio.currentTime = ThisTime;
+          TheCurrentTime        = ThisAudio.currentTime;
+          beginTime             = CalcBeginTime ();
+        }
+        IsGrabed                = false;
+        Waveform.style.cursor   = "";
+
+        if(!(animationFrameID)){
+          Draw ();
+          PlaySample();
+        }
+      }
+      // FUNCTION & EVENT RELATIVE TO VIDEO
+      function OnTimeUpdate       (ThisEvent){
+        if(SamplePlaying){
+          return;
+        }
+        TheCurrentTime          = ThisAudio.currentTime;
+        TotalDuration           = ThisAudio.duration;
+        beginTime               = CalcBeginTime ();
+        // console.log("VidTime:", TheCurrentTime);
+        if(!(animationFrameID)){
+          Draw ();
+          PlaySample();
+        }
+      }
+      ThisAudio.ontimeupdate    = OnTimeUpdate;
+      function OnPlay (){
+        TheCurrentTime          = ThisAudio.currentTime;
+        TotalDuration           = ThisAudio.duration;
+        beginTime               = CalcBeginTime ();
+        // console.log("Rendering");
+        renderFrame();
+      }
+      function OnStop (){
+        if(animationFrameID){
+          // console.log("Rendering Stopped.");
+          cancelAnimationFrame(animationFrameID); animationFrameID = null;
+        }
+      }
+      ThisAudio.onplay          = OnPlay;
+      ThisAudio.onpause         = OnStop;
+      ThisAudio.onended         = OnStop;
+    }
+  }
+  window.onclick                = function (){
+    window.onclick            = null; 
+    WaitingText.innerHTML     = "Processing file...";
+    PlayFromAudio ();
+  }
+  </script>
+</body>
+</html>
