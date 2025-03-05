@@ -10,7 +10,7 @@ It has a Spectrum analyser
 
 It let your hear sample of sound like Premiere Pro.
 
-
+<img src="https://github.com/DCWizard/TrackView-II/blob/main/img/TrackView%20II.webp">
 
 
 
