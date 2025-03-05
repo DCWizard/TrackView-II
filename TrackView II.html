@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content= "width=device-width, initial-scale=1.0">
+  <!-- <script id="PlaySampleJs"  src="PlaySample.js"></script> -->
   <title>TrackView II</title>
   <style>
     *, ::before, ::after {
@@ -184,7 +185,6 @@
   document.getElementById('videoInput').addEventListener('change', handleFileSelect);
   setTimeout(function (){
     WaitingText.innerHTML = "Click to initialize<br>Audio Context";
-    ThePlaySampleWorker.postMessage({"CMD":"Init"}); 
   }, 125);
   var ThisAudio           = document.getElementById('MainAudio');
   
@@ -194,7 +194,8 @@
       WaitingText.innerHTML = "Processing file...";
       WaitingBackground.style.display = "";
       try{
-        AnalyseAudioFile(ThisFile, function (ThisAudioContext, ThisAudioBuffer){     
+        AnalyseAudioFile(ThisFile, function (ThisAudioContext, ThisAudioBuffer){   
+          TheAudiBuffer     = ThisAudioBuffer;  
           ThisChannelData   = ThisAudioBuffer.getChannelData(0);
           // console.log("ThisChannelData", ThisChannelData);        
           var ThatAudio     = URL.createObjectURL(ThisFile);
@@ -211,51 +212,15 @@
   }
   var ThisAudioContext;
   var animationFrameID;
-  var ThePlaySampleWorker;
-  var TheBackThread;
-  try{
-    ThePlaySampleWorker = new Worker('PlaySample.js'); 
-    ThePlaySampleWorker.postMessage({"CMD":"Init"}); 
 
-    ThePlaySampleWorker.onmessage = function (ThisEvent) { 
-      let ThisData  = ThisEvent.data;
-
-      if(ThisData !== undefined){ 
-        let ThisCmd = ThisData.CMD;
-        switch(ThisCmd){
-        case "Running":
-          console.log(ThisCmd);
-          TheBackThread = "Running";
-          break;
-        default:
-          console.log(ThisData);
-          break;
-        }
-      } 
-    };
-  }
-  catch(ThisErr){
-    alert("Not running on a server.\nQuality of PlaySample will be reduced.\n\n" + ThisErr.message);
-  }
-  let ThisInterval = setInterval(function (){
-    if(TheBackThread){
-      clearInterval(ThisInterval);ThisInterval = null;
-    }
-  }, 125);
-  setTimeout(function (){
-    if(ThisInterval){
-      clearInterval(ThisInterval);ThisInterval = null;
-    }
-    if(!(TheBackThread)){
-      alert("Not running on a server.\nQuality of PlaySample will be reduced.\n\n");
-    }
-  }, 2000);
+  var SamplePlaying;
   var SpectrumStarted;
   var TheFrequencyData;
   var TheAnalyser;
   var TheAudioSrc;
 
   var TheArrayBuffer;
+  var TheAudiBuffer;
   var ThisChannelData;
 
   var ThisCanvas        = document.getElementById('TrackView'),
@@ -290,21 +255,20 @@
       density           = getDensity(); // = 1 default
       CenterPlot        = (TrackPadding * gridGap),
       PixRatio          = (gridGap / pixelRatio),
-      GridArea          = (height / gridGap);
+      GridArea          = (height  / gridGap);
       GridScale         = (gridGap * 10);
-      CursorPos         = (width  / 2); // ONLY IN SCROLABLE
-      MiddleHeight      = (height / 2);
-      
-      // BASED ON THE VIDEO:
-      TheCurrentTime    = 0,
-      TotalDuration     = 0,
-      sampleRate        = 0,
+      CursorPos         = (width   / 2); // ONLY IN SCROLABLE
+      MiddleHeight      = (height  / 2);
+      beginTime         = -5
 
       waveScale         = 0.8,
       waveSize          = 1,
-      waveBorderWidth   = 1,
+      waveBorderWidth   = 1;
 
-      beginTime         = -5;
+      // BASED ON THE VIDEO:
+  var TheCurrentTime    = 0,
+      TotalDuration     = 0,
+      sampleRate        = 0;
 
   var ScrollX;
   var IsGrabed          = false;
@@ -439,6 +403,7 @@
         // console.log("ThisArrayBuffer", ThisArrayBuffer);
         TheArrayBuffer      = ThisArrayBuffer;
         ThisAudioContext.decodeAudioData(TheArrayBuffer, function (ThisAudioBuffer){
+          TheAudiBuffer     = ThisAudioBuffer;
           ThisChannelData   = ThisAudioBuffer.getChannelData(0);
           // console.log("ThisChannelData", ThisChannelData);        
           // Start();
@@ -505,39 +470,6 @@
         }
       }
 
-      var SamplePlaying;
-      
-      function PlaySample   (){
-        if(SamplePlaying){
-          return;
-        }
-        if(TheBackThread){
-          ThePlaySampleWorker.postMessage({"CMD":"PlaySample"}); 
-          ThePlaySampleWorker.onmessage = function (ThisEvent) { 
-            let ThisData     = ThisEvent.data;
-            let ThisCmd      = ThisData.CMD;
-            switch(ThisCmd){
-            case "PlaySample":
-              PlayThisSample ();
-              break;
-            }
-            console.log("RCV from PlaySample",  ThisCmd); 
-          };
-        } else {
-          PlayThisSample ();
-        }
-        function PlayThisSample (){
-          let ThisCurrentTime     = ThisAudio.currentTime;
-          SamplePlaying           = setTimeout(function (){
-            setTimeout(function (){
-              SamplePlaying       = null;
-            }, 125);
-            ThisAudio.pause();
-            ThisAudio.currentTime = ThisCurrentTime;
-          },125 );
-          ThisAudio.play();
-        }
-      }
       sampleRate          = ThisAudioContext.sampleRate;
       TheCurrentTime      = ThisAudio.currentTime;
       TotalDuration       = ThisAudio.duration;
@@ -713,8 +645,8 @@
         }
         Draw ();
       }
-      // FUNCTION & EVENT REGARDING THE TRACK VIEW
 
+      // FUNCTION & EVENT REGARDING THE TRACK VIEW
       ThisCanvas.onwheel        = function (ThisEvent){
         var ThisDirection       = Math.sign(ThisEvent.deltaY);
         if(IsShiftKeyDown(ThisEvent)){
@@ -835,8 +767,26 @@
       ThisAudio.onended         = OnStop;
     }
   }
-  // MISC LIB
 
+  async function PlaySample(){
+    if(SamplePlaying){
+      return;
+    }
+    function PlayThisSample (){
+      let ThisCurrentTime     = ThisAudio.currentTime;
+      SamplePlaying           = setTimeout(function (){
+        setTimeout(function (){
+          SamplePlaying       = null;
+        }, 125);
+        ThisAudio.pause();
+        ThisAudio.currentTime = ThisCurrentTime;
+      },125 );
+      ThisAudio.play();
+    }
+    PlayThisSample ();
+  }
+  var ThePlaySample             = PlaySample;
+  // MISC LIB
   function IsNull                 (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) );} // || (isNaN(ThisValue))
   function IsReallyNull           (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) || (isNaN(ThisValue) === false));}
   function IsFalse                (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) || (ThisValue === false));}
