@@ -1,5 +1,6 @@
 // PlaySample.js
-
+// NO USE NOT WORTH THE TROUBLE... 
+// NO SPEED GAIN.
 self.onmessage          = function (ThisEvent){ 
   let ThisData          = ThisEvent.data;
 
