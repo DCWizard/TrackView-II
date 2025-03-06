@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content= "width=device-width, initial-scale=1.0">
-  <!-- <script id="PlaySampleJs"  src="PlaySample.js"></script> -->
   <title>TrackView II</title>
   <style>
     *, ::before, ::after {
@@ -646,6 +645,32 @@
         Draw ();
       }
 
+      var ThePreviousTime;
+      var TheSampleTimeout;
+      function PlaySample(){
+        if(SamplePlaying){
+          clearTimeout(TheSampleTimeout); TheSampleTimeout = null;
+        }
+        if((animationFrameID)){
+          return;
+        }
+        function PlayThisSample (){
+          ThePreviousTime         = ThisAudio.currentTime;
+          SamplePlaying           = true;
+          TheSampleTimeout        = setTimeout(function (){
+            ThisAudio.pause();
+            ThisAudio.currentTime = ThePreviousTime;
+            setTimeout(function (){
+              // console.log("Releasing SamplePlaying", SamplePlaying);
+              ThisAudio.pause();
+              SamplePlaying       = false;
+            }, 125);
+          },125 );
+          ThisAudio.play();
+        }
+        PlayThisSample ();
+      }
+
       // FUNCTION & EVENT REGARDING THE TRACK VIEW
       ThisCanvas.onwheel        = function (ThisEvent){
         var ThisDirection       = Math.sign(ThisEvent.deltaY);
@@ -699,6 +724,8 @@
           ThisAudio.currentTime = LastCurrentTime + (scrollable ? -diffTime : diffTime);
           TheCurrentTime        = ThisAudio.currentTime;
           beginTime             = CalcBeginTime ();
+
+          PlaySample();
         } else {
           WaveCursor.style.left = ThisEvent.pageX - TrackView.getBoundingClientRect().left + 'px';
           let ThisLeftButtonDown= (ThisEvent.buttons || ThisEvent.button) & 1;
@@ -720,22 +747,41 @@
           ThisAudio.currentTime = ThisTime;
           TheCurrentTime        = ThisAudio.currentTime;
           beginTime             = CalcBeginTime ();
+          PlaySample();
         }
         IsGrabed                = false;
         Waveform.style.cursor   = "";
       }
       // FUNCTION & EVENT RELATIVE TO VIDEO
       function OnWheel            (ThisEvent){
-        if(!(ThisAudio)){return;}
-        var ThisDirection       = (ThisEvent.deltaY < 0) ? -1 : 1; // Math.sign(ThisEvent.deltaY);
-        let ThisVolume          = ThisAudio.volume  + (0.05 * ThisDirection); // CtrlVolumeBar.value; 
+        let ThisDirection       = (ThisEvent.deltaY < 0) ? -1 : 1; // Math.sign(ThisEvent.deltaY);
+        let ThisNewTime;
+        if(IsShiftKeyDown(ThisEvent)){
+          if(IsCtrlKeyDown(ThisEvent)){
+            ThisNewTime         = ThisAudio.currentTime  + (0.5  * ThisDirection); 
+          } else {
+            ThisNewTime         = ThisAudio.currentTime  + (0.05 * ThisDirection); 
+          }
+          ThisAudio.currentTime = ThisNewTime;
+          TheCurrentTime        = ThisAudio.currentTime;
+          beginTime             = CalcBeginTime ();
+          PlaySample();
 
-        if(ThisVolume           < 0){ThisVolume     = 0;}
-        if(ThisVolume           > 1){ThisVolume     = 1;}
-        ThisAudio.volume        = ThisVolume;
+        } else {
+          if(!(ThisAudio)){return;}
+          let ThisVolume        = ThisAudio.volume  + (0.05 * ThisDirection); 
+
+          if(ThisVolume         < 0){ThisVolume     = 0;}
+          if(ThisVolume         > 1){ThisVolume     = 1;}
+          ThisAudio.volume      = ThisVolume;
+        }
       }
       ThisAudio.onwheel         = OnWheel;
+
       function OnTimeUpdate       (ThisEvent){
+        if(!(animationFrameID)){
+          Draw ();
+        }
         if(SamplePlaying){
           return;
         }
@@ -743,17 +789,16 @@
         TotalDuration           = ThisAudio.duration;
         beginTime               = CalcBeginTime ();
         // console.log("VidTime:", TheCurrentTime);
-        if(!(animationFrameID)){
-          Draw ();
-          PlaySample();
-        }
       }
       ThisAudio.ontimeupdate    = OnTimeUpdate;
       function OnPlay (){
+        if(SamplePlaying){
+          return;
+        }
         TheCurrentTime          = ThisAudio.currentTime;
         TotalDuration           = ThisAudio.duration;
         beginTime               = CalcBeginTime ();
-        // console.log("Rendering");
+        // console.log("Playing Rendering", SamplePlaying);
         renderFrame();
       }
       function OnStop (){
@@ -768,24 +813,6 @@
     }
   }
 
-  async function PlaySample(){
-    if(SamplePlaying){
-      return;
-    }
-    function PlayThisSample (){
-      let ThisCurrentTime     = ThisAudio.currentTime;
-      SamplePlaying           = setTimeout(function (){
-        setTimeout(function (){
-          SamplePlaying       = null;
-        }, 125);
-        ThisAudio.pause();
-        ThisAudio.currentTime = ThisCurrentTime;
-      },125 );
-      ThisAudio.play();
-    }
-    PlayThisSample ();
-  }
-  var ThePlaySample             = PlaySample;
   // MISC LIB
   function IsNull                 (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) );} // || (isNaN(ThisValue))
   function IsReallyNull           (ThisValue)          { return ((ThisValue === undefined) || (ThisValue === null) || (isNaN(ThisValue) === false));}
