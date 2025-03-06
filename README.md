@@ -1,4 +1,4 @@
-A Simple Video Player 
+A Simple Video Player as a base for a Video Editor
 
 Based on TrackView org which is based on WFPlayer
 
@@ -47,8 +47,8 @@ Such as:
 -A Jeopardy Editor
 
 -A Video Player.
+If you appreciate my work.
 
-You can also give me donation via Wechat My Wechat
+You can give me donation from my web site: https://thinknspeak.net/product/donation/
 
-Or directly from my web site: https://thinknspeak.net/product/donation/
-
+Or directly via Wechat <a href="https://github.com/DCWizard/WriteIt/raw/refs/heads/main/img/MyWechat.webp" >My Wechat</a>
