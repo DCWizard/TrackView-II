@@ -7,7 +7,8 @@ Special thanks to https://github.com/zhw2590582/WFPlayer for the Very nice desig
 This version is superior
 
 It has a Spectrum analyser
-You can zoom in/out with the mouse wheel.
+
+You can zoom in/out by pressing the shift key with the mouse wheel. 
 
 It let your hear sample of sound as you move the cursor like in Premiere Pro.
 Every editor I tried don't have that feature;
