@@ -18,7 +18,8 @@ Yeah, I'm talking to you WonderShare for example. I've been asking you for that 
 
 <img src="https://github.com/DCWizard/TrackView-II/blob/main/img/TrackView%20II.webp">
 
-
+You might want to have a look at TrackView III 
+<strong>You might be interested in my '<a href="https://github.com/DCWizard/TrackView-III" >TrackView III</a>' version I added a few goodies.</strong>
 
 To see, to use... ect.
 
